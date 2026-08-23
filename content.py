@@ -48,7 +48,7 @@ TOPIC_CATEGORIES = {
     6: "Gesundheit und Lebensstil",
 }
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-3.6-flash"
 
 
 class VocabularyEntry(BaseModel):
@@ -125,6 +125,7 @@ def generate_lesson(today: date | None = None) -> dict:
             system_instruction=system_prompt,
             response_mime_type="application/json",
             response_schema=Lesson,
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         ),
     )
 

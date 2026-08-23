@@ -54,7 +54,7 @@ secret**, and add:
 | `GEMINI_API_KEY`      | Key from step 3      |
 
 Optionally set the `GEMINI_MODEL` env var in the workflow file to use a
-different model (defaults to `gemini-2.5-flash`).
+different model (defaults to `gemini-3.6-flash`).
 
 ### 5. Done
 
