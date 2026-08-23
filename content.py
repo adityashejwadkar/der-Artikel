@@ -1,9 +1,10 @@
-"""Generates the daily German lesson content via the Claude (Anthropic) API."""
+"""Generates the daily German lesson content via the Google Gemini API."""
 
 import os
 from datetime import date
 
-import anthropic
+from google import genai
+from google.genai import types
 from pydantic import BaseModel, Field
 
 # CEFR B1 -> B2 grammar progression. One topic is picked per calendar day
@@ -47,7 +48,7 @@ TOPIC_CATEGORIES = {
     6: "Gesundheit und Lebensstil",
 }
 
-DEFAULT_MODEL = "claude-opus-5"
+DEFAULT_MODEL = "gemini-2.5-flash"
 
 
 class VocabularyEntry(BaseModel):
@@ -83,13 +84,13 @@ def pick_topic_category(today: date) -> str:
 
 
 def generate_lesson(today: date | None = None) -> dict:
-    """Call the Claude API and return the structured lesson content."""
+    """Call the Gemini API and return the structured lesson content."""
     today = today or date.today()
     grammar_topic = pick_grammar_topic(today)
     topic_category = pick_topic_category(today)
 
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    model = os.environ.get("ANTHROPIC_MODEL", DEFAULT_MODEL)
+    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    model = os.environ.get("GEMINI_MODEL", DEFAULT_MODEL)
 
     system_prompt = (
         "You are an experienced German language tutor preparing a daily lesson "
@@ -117,15 +118,17 @@ def generate_lesson(today: date | None = None) -> dict:
         "English meaning, and a German example sentence."
     )
 
-    response = client.messages.parse(
+    response = client.models.generate_content(
         model=model,
-        max_tokens=16000,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_prompt}],
-        output_format=Lesson,
+        contents=user_prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            response_mime_type="application/json",
+            response_schema=Lesson,
+        ),
     )
 
-    lesson = response.parsed_output.model_dump()
+    lesson = response.parsed.model_dump()
     lesson["grammar_topic"] = grammar_topic
     lesson["topic_category"] = topic_category
     lesson["date"] = today.isoformat()

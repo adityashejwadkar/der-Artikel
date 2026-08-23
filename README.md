@@ -11,8 +11,8 @@ Every morning at 8:00 AM IST it sends a Telegram message with:
 - 📝 8-10 vocabulary words drawn from the article, with gender articles,
   English meanings, and example sentences
 
-Content is generated fresh each day by the Claude (Anthropic) API and
-delivered via a GitHub Actions scheduled workflow
+Content is generated fresh each day by the Google Gemini API and delivered
+via a GitHub Actions scheduled workflow
 (`.github/workflows/german-lesson.yml`) — no server to run yourself.
 
 ## One-time setup
@@ -36,11 +36,11 @@ delivered via a GitHub Actions scheduled workflow
   then check the same `getUpdates` URL — group chat IDs are negative
   numbers.
 
-### 3. Get an Anthropic (Claude) API key
+### 3. Get a Gemini API key
 
-Create one at <https://console.anthropic.com/settings/keys>. You'll need a
-payment method / credits on the account, or requests will fail with a quota
-error.
+Create one at <https://aistudio.google.com/apikey>. The free tier is
+generous enough for one lesson a day; no billing setup is required to get
+started.
 
 ### 4. Add repository secrets
 
@@ -51,10 +51,10 @@ secret**, and add:
 | --------------------- | -------------------- |
 | `TELEGRAM_BOT_TOKEN`  | Token from BotFather |
 | `TELEGRAM_CHAT_ID`    | Chat ID from step 2  |
-| `ANTHROPIC_API_KEY`   | Key from step 3      |
+| `GEMINI_API_KEY`      | Key from step 3      |
 
-Optionally set the `ANTHROPIC_MODEL` env var in the workflow file to use a
-different model (defaults to `claude-opus-5`).
+Optionally set the `GEMINI_MODEL` env var in the workflow file to use a
+different model (defaults to `gemini-2.5-flash`).
 
 ### 5. Done
 
@@ -73,7 +73,7 @@ Actions cron is always in UTC — convert your desired local time to UTC.
 pip install -r requirements.txt
 export TELEGRAM_BOT_TOKEN=...
 export TELEGRAM_CHAT_ID=...
-export ANTHROPIC_API_KEY=...
+export GEMINI_API_KEY=...
 python main.py
 ```
 
