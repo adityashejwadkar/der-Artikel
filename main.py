@@ -2,9 +2,9 @@
 
 Run daily by the `.github/workflows/german-lesson.yml` scheduled workflow.
 Required environment variables:
-  TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, OPENAI_API_KEY
+  TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, ANTHROPIC_API_KEY
 Optional:
-  OPENAI_MODEL (defaults to gpt-4o-mini)
+  ANTHROPIC_MODEL (defaults to claude-opus-5)
 """
 
 import sys

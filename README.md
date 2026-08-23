@@ -11,9 +11,9 @@ Every morning at 8:00 AM IST it sends a Telegram message with:
 - 📝 8-10 vocabulary words drawn from the article, with gender articles,
   English meanings, and example sentences
 
-Content is generated fresh each day by the OpenAI API and delivered via a
-GitHub Actions scheduled workflow (`.github/workflows/german-lesson.yml`) —
-no server to run yourself.
+Content is generated fresh each day by the Claude (Anthropic) API and
+delivered via a GitHub Actions scheduled workflow
+(`.github/workflows/german-lesson.yml`) — no server to run yourself.
 
 ## One-time setup
 
@@ -36,9 +36,11 @@ no server to run yourself.
   then check the same `getUpdates` URL — group chat IDs are negative
   numbers.
 
-### 3. Get an OpenAI API key
+### 3. Get an Anthropic (Claude) API key
 
-Create one at <https://platform.openai.com/api-keys>.
+Create one at <https://console.anthropic.com/settings/keys>. You'll need a
+payment method / credits on the account, or requests will fail with a quota
+error.
 
 ### 4. Add repository secrets
 
@@ -49,10 +51,10 @@ secret**, and add:
 | --------------------- | -------------------- |
 | `TELEGRAM_BOT_TOKEN`  | Token from BotFather |
 | `TELEGRAM_CHAT_ID`    | Chat ID from step 2  |
-| `OPENAI_API_KEY`      | Key from step 3      |
+| `ANTHROPIC_API_KEY`   | Key from step 3      |
 
-Optionally set the `OPENAI_MODEL` env var in the workflow file to use a
-different model (defaults to `gpt-4o-mini`).
+Optionally set the `ANTHROPIC_MODEL` env var in the workflow file to use a
+different model (defaults to `claude-opus-5`).
 
 ### 5. Done
 
@@ -71,7 +73,7 @@ Actions cron is always in UTC — convert your desired local time to UTC.
 pip install -r requirements.txt
 export TELEGRAM_BOT_TOKEN=...
 export TELEGRAM_CHAT_ID=...
-export OPENAI_API_KEY=...
+export ANTHROPIC_API_KEY=...
 python main.py
 ```
 

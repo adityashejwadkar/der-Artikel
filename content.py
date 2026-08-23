@@ -1,10 +1,10 @@
-"""Generates the daily German lesson content via the OpenAI API."""
+"""Generates the daily German lesson content via the Claude (Anthropic) API."""
 
-import json
 import os
 from datetime import date
 
-from openai import OpenAI
+import anthropic
+from pydantic import BaseModel, Field
 
 # CEFR B1 -> B2 grammar progression. One topic is picked per calendar day
 # (deterministically, so re-running the same day yields the same topic) and
@@ -47,67 +47,31 @@ TOPIC_CATEGORIES = {
     6: "Gesundheit und Lebensstil",
 }
 
-DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_MODEL = "claude-opus-5"
 
-RESPONSE_SCHEMA = {
-    "type": "json_schema",
-    "json_schema": {
-        "name": "german_lesson",
-        "schema": {
-            "type": "object",
-            "properties": {
-                "article_title_de": {"type": "string"},
-                "article_de": {
-                    "type": "string",
-                    "description": "180-220 word German article at CEFR B1-B2 level.",
-                },
-                "article_summary_en": {
-                    "type": "string",
-                    "description": "One or two sentence English summary of the article.",
-                },
-                "grammar_explanation_en": {
-                    "type": "string",
-                    "description": "Concise English explanation (~120-180 words) of the assigned grammar topic, referencing German examples.",
-                },
-                "grammar_examples": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "3-4 German example sentences (with English translation in parentheses) illustrating the grammar topic. Ideally drawn from or related to the article.",
-                },
-                "vocabulary": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "word": {"type": "string"},
-                            "article": {
-                                "type": "string",
-                                "description": "der/die/das for nouns, or empty string for non-nouns.",
-                            },
-                            "english": {"type": "string"},
-                            "example_de": {"type": "string"},
-                        },
-                        "required": ["word", "article", "english", "example_de"],
-                        "additionalProperties": False,
-                    },
-                    "minItems": 8,
-                    "maxItems": 10,
-                    "description": "Useful B1-B2 vocabulary drawn from the article.",
-                },
-            },
-            "required": [
-                "article_title_de",
-                "article_de",
-                "article_summary_en",
-                "grammar_explanation_en",
-                "grammar_examples",
-                "vocabulary",
-            ],
-            "additionalProperties": False,
-        },
-        "strict": True,
-    },
-}
+
+class VocabularyEntry(BaseModel):
+    word: str
+    article: str = Field(description="der/die/das for nouns, or empty string for non-nouns.")
+    english: str
+    example_de: str
+
+
+class Lesson(BaseModel):
+    article_title_de: str
+    article_de: str = Field(description="180-220 word German article at CEFR B1-B2 level.")
+    article_summary_en: str = Field(description="One or two sentence English summary of the article.")
+    grammar_explanation_en: str = Field(
+        description="Concise English explanation (~120-180 words) of the assigned grammar topic, referencing German examples."
+    )
+    grammar_examples: list[str] = Field(
+        description="3-4 German example sentences (with English translation in parentheses) illustrating the grammar topic."
+    )
+    vocabulary: list[VocabularyEntry] = Field(
+        min_length=8,
+        max_length=10,
+        description="8-10 useful B1-B2 vocabulary words/phrases drawn from the article.",
+    )
 
 
 def pick_grammar_topic(today: date) -> str:
@@ -119,13 +83,13 @@ def pick_topic_category(today: date) -> str:
 
 
 def generate_lesson(today: date | None = None) -> dict:
-    """Call the OpenAI API and return the structured lesson content."""
+    """Call the Claude API and return the structured lesson content."""
     today = today or date.today()
     grammar_topic = pick_grammar_topic(today)
     topic_category = pick_topic_category(today)
 
-    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-    model = os.environ.get("OPENAI_MODEL", DEFAULT_MODEL)
+    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    model = os.environ.get("ANTHROPIC_MODEL", DEFAULT_MODEL)
 
     system_prompt = (
         "You are an experienced German language tutor preparing a daily lesson "
@@ -133,8 +97,7 @@ def generate_lesson(today: date | None = None) -> dict:
         "working towards B2. The article should be fully in German, natural and "
         "engaging, slightly stretching the learner (B1-B2), avoiding rare or "
         "archaic vocabulary. The grammar explanation and vocabulary glosses are "
-        "in English so the learner can self-check. Respond only with the "
-        "requested JSON."
+        "in English so the learner can self-check."
     )
 
     user_prompt = (
@@ -154,16 +117,15 @@ def generate_lesson(today: date | None = None) -> dict:
         "English meaning, and a German example sentence."
     )
 
-    completion = client.chat.completions.create(
+    response = client.messages.parse(
         model=model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        response_format=RESPONSE_SCHEMA,
+        max_tokens=16000,
+        system=system_prompt,
+        messages=[{"role": "user", "content": user_prompt}],
+        output_format=Lesson,
     )
 
-    lesson = json.loads(completion.choices[0].message.content)
+    lesson = response.parsed_output.model_dump()
     lesson["grammar_topic"] = grammar_topic
     lesson["topic_category"] = topic_category
     lesson["date"] = today.isoformat()
