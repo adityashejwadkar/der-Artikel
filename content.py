@@ -1,9 +1,11 @@
 """Generates the daily German lesson content via the Google Gemini API."""
 
 import os
+import time
 from datetime import date
 
 from google import genai
+from google.genai import errors
 from google.genai import types
 from pydantic import BaseModel, Field
 
@@ -49,6 +51,8 @@ TOPIC_CATEGORIES = {
 }
 
 DEFAULT_MODEL = "gemini-3.6-flash"
+MAX_GENERATE_ATTEMPTS = 3
+INITIAL_RETRY_DELAY_SECONDS = 2
 
 
 class VocabularyEntry(BaseModel):
@@ -81,6 +85,16 @@ def pick_grammar_topic(today: date) -> str:
 
 def pick_topic_category(today: date) -> str:
     return TOPIC_CATEGORIES[today.weekday()]
+
+
+def _is_retryable_generation_error(exc: Exception) -> bool:
+    if isinstance(exc, errors.ServerError):
+        status_code = getattr(exc, "status_code", None)
+        if status_code in {429, 500, 502, 503, 504}:
+            return True
+        message = str(exc).upper()
+        return "UNAVAILABLE" in message or "RESOURCE_EXHAUSTED" in message
+    return False
 
 
 def generate_lesson(today: date | None = None) -> dict:
@@ -118,16 +132,27 @@ def generate_lesson(today: date | None = None) -> dict:
         "English meaning, and a German example sentence."
     )
 
-    response = client.models.generate_content(
-        model=model,
-        contents=user_prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            response_mime_type="application/json",
-            response_schema=Lesson,
-            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
-        ),
-    )
+    attempts = max(1, int(os.environ.get("GEMINI_MAX_ATTEMPTS", MAX_GENERATE_ATTEMPTS)))
+    delay_seconds = max(1, int(os.environ.get("GEMINI_RETRY_INITIAL_DELAY_SECONDS", INITIAL_RETRY_DELAY_SECONDS)))
+    for attempt in range(1, attempts + 1):
+        try:
+            response = client.models.generate_content(
+                model=model,
+                contents=user_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    response_mime_type="application/json",
+                    response_schema=Lesson,
+                    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+                ),
+            )
+            break
+        except Exception as exc:
+            if attempt == attempts:
+                raise
+            if not _is_retryable_generation_error(exc):
+                raise
+            time.sleep(delay_seconds * (2 ** (attempt - 1)))
 
     lesson = response.parsed.model_dump()
     lesson["grammar_topic"] = grammar_topic
